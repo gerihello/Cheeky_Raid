@@ -1028,6 +1028,105 @@ function closeStreakModal(e) { if (e.target.classList.contains('modal-overlay'))
 setInterval(() => { if (state.energy < state.maxEnergy) { state.energy++; render(); } }, 60000);
 
 render();
+  // ============ API CONNECTION ============
+
+const API_BASE = ''; // same domain, leave empty
+
+// Get Telegram init data for auth
+function getInitData() {
+    try {
+        return Telegram.WebApp.initData;
+    } catch(e) {
+        return '';
+    }
+}
+
+// Load player from server
+async function loadPlayer() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/player`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: getInitData() })
+        });
+        const data = await resp.json();
+
+        if (data.player) {
+            // Update your UI with server data
+            coins = data.player.coins;
+            updateCoinDisplay();
+
+            // Show raid notifications
+            if (data.recentRaids && data.recentRaids.length > 0) {
+                showRaidNotifications(data.recentRaids);
+            }
+        }
+    } catch(err) {
+        console.log('Offline mode - using local data');
+    }
+}
+
+// Raid via server
+async function serverRaid() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/raid`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: getInitData() })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            // Show raid success UI
+            showRaidResult({
+                won: true,
+                target: data.defender.display_name,
+                amount: data.coinsStolen,
+                vaultLevel: data.defender.vault_level
+            });
+            coins = data.newBalance;
+        } else {
+            showRaidResult({
+                won: false,
+                target: data.defender.display_name
+            });
+        }
+        updateCoinDisplay();
+    } catch(err) {
+        console.log('Raid failed - network error');
+    }
+}
+
+// Server-side daily reward claim
+async function serverClaimDaily() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/daily-reward`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ initData: getInitData() })
+        });
+        return await resp.json();
+    } catch(err) {
+        return null;
+    }
+}
+
+// Get leaderboard
+async function loadLeaderboard(type = 'coins') {
+    try {
+        const resp = await fetch(`${API_BASE}/api/leaderboard?type=${type}`);
+        const data = await resp.json();
+        return data.leaderboard;
+    } catch(err) {
+        return [];
+    }
+}
+
+// Load player on start
+document.addEventListener('DOMContentLoaded', () => {
+    loadPlayer();
+});
+
 </script>
 </body>
 </html>
